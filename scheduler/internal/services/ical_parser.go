@@ -1,0 +1,137 @@
+package services
+
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
+	"middleware/scheduler/internal/models"
+	"net/http"
+	"strings"
+)
+
+// FetchAndParseEvents récupère et parse les événements depuis l'UCA
+func FetchAndParseEvents(agendaIDs []string) ([]models.Event, error) {
+	// Construire l'URL avec les IDs des agendas
+	url := buildEDTURL(agendaIDs)
+
+	// Récupérer les données
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la récupération des données: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("statut HTTP non OK: %d", resp.StatusCode)
+	}
+
+	// Lire toutes les données
+	rawData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la lecture des données: %w", err)
+	}
+
+	// Parser les événements
+	events, err := parseICalData(rawData)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors du parsing: %w", err)
+	}
+
+	return events, nil
+}
+
+// buildEDTURL construit l'URL de l'EDT avec les IDs des agendas
+func buildEDTURL(agendaIDs []string) string {
+	baseURL := "https://edt.uca.fr/jsp/custom/modules/plannings/anonymous_cal.jsp"
+	resources := strings.Join(agendaIDs, ",")
+
+	return fmt.Sprintf("%s?resources=%s&projectId=3&calType=ical&nbWeeks=4&displayConfigId=128",
+		baseURL, resources)
+}
+
+// parseICalData parse les données iCal brutes
+func parseICalData(rawData []byte) ([]models.Event, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(rawData))
+
+	var events []models.Event
+	var currentEvent models.Event
+	var currentKey string
+	var currentValue string
+	inEvent := false
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Ignorer les lignes hors événement
+		if !inEvent && line != "BEGIN:VEVENT" {
+			continue
+		}
+
+		// Début d'un nouvel événement
+		if line == "BEGIN:VEVENT" {
+			inEvent = true
+			currentEvent = models.Event{}
+			continue
+		}
+
+		// Fin d'un événement
+		if line == "END:VEVENT" {
+			inEvent = false
+			events = append(events, currentEvent)
+			continue
+		}
+
+		// Gestion des lignes multi-lignes (commencent par un espace ou tab)
+		if len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
+			currentValue += strings.TrimSpace(line)
+			updateEventField(&currentEvent, currentKey, currentValue)
+			continue
+		}
+
+		// Parser la ligne courante
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		currentKey = parts[0]
+		currentValue = parts[1]
+
+		// Stocker l'attribut de l'événement
+		updateEventField(&currentEvent, currentKey, currentValue)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("erreur lors du scan: %w", err)
+	}
+
+	return events, nil
+}
+
+// updateEventField met à jour un champ de l'événement selon la clé
+func updateEventField(event *models.Event, key, value string) {
+	// Gérer les clés avec paramètres (ex: DTSTART;TZID=...)
+	baseKey := strings.Split(key, ";")[0]
+
+	switch baseKey {
+	case "UID":
+		event.UID = value
+	case "SUMMARY":
+		event.Summary = value
+	case "DESCRIPTION":
+		event.Description = value
+	case "LOCATION":
+		event.Location = value
+	case "DTSTART":
+		event.DTStart = value
+	case "DTEND":
+		event.DTEnd = value
+	case "DTSTAMP":
+		event.DTStamp = value
+	case "STATUS":
+		event.Status = value
+	case "CATEGORIES":
+		event.Categories = value
+	}
+}
