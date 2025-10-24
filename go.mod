@@ -1,4 +1,4 @@
-module middleware/scheduler
+module middleware/timetable
 
 go 1.24.8
 
