@@ -1,35 +1,54 @@
 package main
 
 import (
-	"fmt"
 	"middleware/timetable/internal/controllers/events"
 	"middleware/timetable/internal/helpers"
 	_ "middleware/timetable/internal/models"
+	eventsService "middleware/timetable/internal/services/events"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	_ "github.com/go-chi/chi/v5"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
+	// Initialiser NATS
+	if err := helpers.InitNATS("localhost:4222"); err != nil {
+		logrus.Fatalf("❌ Erreur connexion NATS: %v", err)
+	}
+	defer helpers.CloseNATS()
 
-	// Appel pour tester l'insertion
-	if err := InsertEvent(); err != nil {
-		logrus.Error(err)
+	// Initialiser le stream ALERTS
+	if err := helpers.InitAlertStream(); err != nil {
+		logrus.Fatalf("❌ Erreur création stream ALERTS: %v", err)
 	}
 
+	// Créer le consumer durable
+	consumer, err := eventsService.EventConsumer()
+	if err != nil {
+		logrus.Warnf("⚠️ Erreur création consumer: %v", err)
+	} else {
+		// Lancer le consumer dans une go routine
+		go func() {
+			logrus.Info("🎧 Consumer NATS démarré")
+			if err := eventsService.Consume(*consumer); err != nil {
+				logrus.Errorf("❌ Erreur consumer: %v", err)
+			}
+		}()
+	}
+
+	// Créer le routeur HTTP
 	r := chi.NewRouter()
 
-	r.Route("/events", func(r chi.Router) { // route /events
-		r.Get("/", events.GetEvents)          // GET /users
-		r.Route("/{id}", func(r chi.Router) { // route /events/{id}
-			r.Use(events.Context)       // Use Context method to get event ID
-			r.Get("/", events.GetEvent) // GET /events/{id}
+	r.Route("/events", func(r chi.Router) {
+		r.Get("/", events.GetEvents)
+		r.Route("/{id}", func(r chi.Router) {
+			r.Use(events.Context)
+			r.Get("/", events.GetEvent)
 		})
 	})
 
-	logrus.Info("[INFO] Web server started. Now listening on *:8081")
+	logrus.Info("🚀 API Timetable started. Now listening on *:8081")
 	logrus.Fatalln(http.ListenAndServe(":8081", r))
 }
 
@@ -41,56 +60,24 @@ func init() {
 
 	schemes := []string{
 		`CREATE TABLE IF NOT EXISTS events (
-id VARCHAR(255) PRIMARY KEY NOT NULL UNIQUE,
-uid VARCHAR(255),
-name VARCHAR(255) NOT NULL,
-description TEXT,
-start TIMESTAMP,
-end TIMESTAMP,
-location VARCHAR(255),
-last_update TIMESTAMP,
-agenda_ids TEXT
-);`,
+			id VARCHAR(255) PRIMARY KEY NOT NULL UNIQUE,
+			uid VARCHAR(255) UNIQUE,
+			name VARCHAR(255) NOT NULL,
+			description TEXT,
+			start TIMESTAMP,
+			end TIMESTAMP,
+			location VARCHAR(255),
+			last_update TIMESTAMP,
+			agenda_ids TEXT
+		);`,
 	}
 
 	for _, scheme := range schemes {
 		if _, err := db.Exec(scheme); err != nil {
-			logrus.Fatalf("Could not generate table 'events'! Error was: %s", err.Error())
+			logrus.Fatalf("Could not generate table! Error: %s", err.Error())
 		}
 	}
 
 	helpers.CloseDB(db)
-}
-
-func InsertEvent() error {
-	db, err := helpers.OpenDB()
-	if err != nil {
-		return fmt.Errorf("erreur de connexion à la base : %w", err)
-	}
-	defer helpers.CloseDB(db)
-
-	query := `
-INSERT INTO events (
-id, uid, name, description, start, "end", location, last_update, agenda_ids
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-`
-
-	_, err = db.Exec(query,
-		"62a2beca-26cf-45bf-aa82-4cf5b14922fd",
-		"ADE60323032342d323032352d5543412d36303334342d302d32",
-		"TD Entrepôt de données - G1",
-		"\n\nM1 GROUPE 1 langue\nPAILLOUX MARIE\n\n(Updated :26/11/2024 09:51)",
-		"2025-01-23T15:45:00+01:00",
-		"2025-01-23T17:45:00+01:00",
-		"IS_A104",
-		"2024-11-26T09:51:00+01:00",
-		`["d5c60e7a-10cd-4aec-9ea5-96d071ba824b"]`,
-	)
-
-	if err != nil {
-		return fmt.Errorf("erreur lors de l'insertion : %w", err)
-	}
-
-	fmt.Println("Événement inséré avec succès dans SQLite !")
-	return nil
+	logrus.Info("✅ Database initialized")
 }
