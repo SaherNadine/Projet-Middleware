@@ -122,6 +122,9 @@ go run cmd/main.go --debug
 # ✅ Consumer Timetable en écoute sur EVENTS.>
 ```
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/52410342-a068-4f81-abe7-bb85ee09eeb5" />
+
+
 ### 3. Démarrer Alerter
 ```bash
 cd alerter
@@ -132,12 +135,18 @@ go run cmd/main.go \
 # ✅ Consumer Alerter en écoute...
 ```
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7debec54-8873-4e06-be13-d8a68054bdc6" />
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d985ca2c-586a-4de2-8bd3-3c244ba18f10" />
+
+
 ### 4. Démarrer Scheduler
 ```bash
 cd scheduler
 go run cmd/main.go
 # ✅ Scheduler en cours d'exécution
 ```
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/c4ed2b7d-8339-4d26-bb9c-2d5b5c99941d" />
 
 ## ⚙️ Configuration
 
@@ -174,6 +183,8 @@ curl -X POST http://localhost:8080/alerts \
     "is_active": true
   }'
 ```
+
+
 
 ### Conditions d'alerte disponibles
 | Condition | Description |
