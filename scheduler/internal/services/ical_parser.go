@@ -10,7 +10,50 @@ import (
 	"strings"
 )
 
-// FetchAndParseEvents récupère et parse les événements depuis l'UCA
+// -----------------------------
+// Fetch Agendas depuis API Config
+// -----------------------------
+/*
+func FetchAgendasFromAPI(configAPIURL string) ([]models.Agenda, error) {
+	url := fmt.Sprintf("%s/agendas", configAPIURL)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la requête vers l'API Config: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("statut HTTP non OK depuis API Config: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la lecture de la réponse: %w", err)
+	}
+
+	var agendas []models.Agenda
+	if err := json.Unmarshal(body, &agendas); err != nil {
+		return nil, fmt.Errorf("erreur lors du parsing JSON: %w", err)
+	}
+
+	return agendas, nil
+}*/
+
+// Extraire uniquement les IDs UCA
+/*
+func ExtractAgendaIDs(agendas []models.Agenda) []string {
+	ids := make([]string, len(agendas))
+	for i, agenda := range agendas {
+		ids[i] = agenda.UCAID
+	}
+	return ids
+}*/
+
+// -----------------------------
+// Fetch & Parse Events depuis l'UCA
+// -----------------------------
+
 func FetchAndParseEvents(agendaIDs []string) ([]models.Event, error) {
 	// Construire l'URL avec les IDs des agendas
 	url := buildEDTURL(agendaIDs)
@@ -33,7 +76,7 @@ func FetchAndParseEvents(agendaIDs []string) ([]models.Event, error) {
 	}
 
 	// Parser les événements
-	events, err := parseICalData(rawData)
+	events, err := parseICalData(rawData, agendaIDs)
 	if err != nil {
 		return nil, fmt.Errorf("erreur lors du parsing: %w", err)
 	}
@@ -51,7 +94,7 @@ func buildEDTURL(agendaIDs []string) string {
 }
 
 // parseICalData parse les données iCal brutes
-func parseICalData(rawData []byte) ([]models.Event, error) {
+func parseICalData(rawData []byte, agendaIDs []string) ([]models.Event, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(rawData))
 
 	var events []models.Event
@@ -63,21 +106,22 @@ func parseICalData(rawData []byte) ([]models.Event, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Ignorer les lignes hors événement
 		if !inEvent && line != "BEGIN:VEVENT" {
 			continue
 		}
 
-		// Début d'un nouvel événement
 		if line == "BEGIN:VEVENT" {
 			inEvent = true
 			currentEvent = models.Event{}
 			continue
 		}
 
-		// Fin d'un événement
 		if line == "END:VEVENT" {
 			inEvent = false
+
+			// ✅ Remplir AgendaIDs pour chaque événement
+			currentEvent.AgendaIDs = agendaIDs
+
 			events = append(events, currentEvent)
 			continue
 		}
@@ -98,7 +142,6 @@ func parseICalData(rawData []byte) ([]models.Event, error) {
 		currentKey = parts[0]
 		currentValue = parts[1]
 
-		// Stocker l'attribut de l'événement
 		updateEventField(&currentEvent, currentKey, currentValue)
 	}
 
@@ -109,7 +152,7 @@ func parseICalData(rawData []byte) ([]models.Event, error) {
 	return events, nil
 }
 
-// updateEventField met à jour un champ de l'événement selon la clé
+// updateEventField met à jour un champ de l'événement selon la clé iCal
 func updateEventField(event *models.Event, key, value string) {
 	// Gérer les clés avec paramètres (ex: DTSTART;TZID=...)
 	baseKey := strings.Split(key, ";")[0]

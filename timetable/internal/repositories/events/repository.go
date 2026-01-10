@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// GetAllEvents récupère tous les événements
 func GetAllEvents() ([]models.Event, error) {
 	db, err := helpers.OpenDB()
 	if err != nil {
@@ -50,6 +51,8 @@ func GetAllEvents() ([]models.Event, error) {
 			if err := json.Unmarshal([]byte(agendaIDsStr), &e.AgendaIDs); err != nil {
 				logrus.Warn("Could not parse agenda_ids JSON: ", err)
 			}
+		} else {
+			e.AgendaIDs = []string{}
 		}
 
 		events = append(events, e)
@@ -95,6 +98,8 @@ func GetEventById(id uuid.UUID) (*models.Event, error) {
 		if err := json.Unmarshal([]byte(agendaIDsStr), &e.AgendaIDs); err != nil {
 			logrus.Warn("Could not parse agenda_ids JSON: ", err)
 		}
+	} else {
+		e.AgendaIDs = []string{}
 	}
 
 	return &e, nil
@@ -137,6 +142,8 @@ func GetEventByUID(uid string) (*models.Event, error) {
 		if err := json.Unmarshal([]byte(agendaIDsStr), &e.AgendaIDs); err != nil {
 			logrus.Warn("Could not parse agenda_ids JSON: ", err)
 		}
+	} else {
+		e.AgendaIDs = []string{}
 	}
 
 	return &e, nil
@@ -153,6 +160,11 @@ func InsertEvent(event models.Event) error {
 	// Générer UUID si absent
 	if event.ID == uuid.Nil {
 		event.ID, _ = uuid.NewV4()
+	}
+
+	// ⚡ S'assurer qu'AgendaIDs n'est jamais nil
+	if event.AgendaIDs == nil {
+		event.AgendaIDs = []string{}
 	}
 
 	// Convertir AgendaIDs en JSON
@@ -174,6 +186,11 @@ func UpdateEvent(event models.Event) error {
 		return err
 	}
 	defer helpers.CloseDB(db)
+
+	// ⚡ S'assurer qu'AgendaIDs n'est jamais nil
+	if event.AgendaIDs == nil {
+		event.AgendaIDs = []string{}
+	}
 
 	// Convertir AgendaIDs en JSON
 	agendaIDsJSON, _ := json.Marshal(event.AgendaIDs)
