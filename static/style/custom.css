@@ -1,0 +1,19 @@
+.color-yellow {
+    color: #efa31d !important;
+}
+
+.bg-yellow {
+    background-color: #efa31d;
+}
+
+.btn-yellow {
+    background-color: rgba(239, 163, 29, 0.9);
+}
+.btn-yellow:hover {
+    background-color: #a67316;
+}
+
+.clickable:hover {
+    cursor: pointer;
+    opacity: 0.5;
+}
