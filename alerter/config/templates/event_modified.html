@@ -1,0 +1,114 @@
+---
+subject: "EDU Middleware - Événement modifié : {{ .EventName }}"
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+body {
+font-family: Arial, sans-serif;
+line-height: 1.6;
+color: #333;
+max-width: 600px;
+margin: 0 auto;
+padding: 20px;
+}
+.header {
+background-color: #4CAF50;
+color: white;
+padding: 15px;
+text-align: center;
+border-radius: 5px 5px 0 0;
+}
+.content {
+padding: 20px;
+background-color: #f9f9f9;
+border: 1px solid #ddd;
+border-top: none;
+}
+.change-type {
+display: inline-block;
+padding: 5px 10px;
+border-radius: 3px;
+font-weight: bold;
+margin-bottom: 15px;
+}
+.change-type.modified { background-color: #FF9800; color: white; }
+.change-type.created { background-color: #4CAF50; color: white; }
+.change-type.deleted { background-color: #f44336; color: white; }
+.changes-table {
+width: 100%;
+border-collapse: collapse;
+margin: 15px 0;
+}
+.changes-table th, .changes-table td {
+padding: 10px;
+border: 1px solid #ddd;
+text-align: left;
+}
+.changes-table th {
+background-color: #4CAF50;
+color: white;
+}
+.old-value { color: #f44336; text-decoration: line-through; }
+.new-value { color: #4CAF50; font-weight: bold; }
+.footer {
+padding: 15px;
+text-align: center;
+font-size: 12px;
+color: #666;
+}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>🔔 Alerte Emploi du Temps</h1>
+</div>
+
+<div class="content">
+<p>Bonjour,</p>
+
+<p>L'événement <strong>{{ .EventName }}</strong> de l'agenda <strong>{{ .AgendaNames }}</strong> a été
+<span class="change-type {{ .ChangeType }}">{{ .ChangeType }}</span>.</p>
+
+{{ if .Changes }}
+<h3>📋 Détails des modifications :</h3>
+<table class="changes-table">
+<thead>
+<tr>
+<th>Champ</th>
+<th>Ancienne valeur</th>
+<th>Nouvelle valeur</th>
+</tr>
+</thead>
+<tbody>
+{{ range .Changes }}
+<tr>
+<td><strong>{{ .Field }}</strong></td>
+<td class="old-value">{{ .OldValue }}</td>
+<td class="new-value">{{ .NewValue }}</td>
+</tr>
+{{ end }}
+</tbody>
+</table>
+{{ end }}
+
+{{ if .NewLocation }}
+<p>📍 <strong>Nouvelle salle :</strong> {{ .NewLocation }}</p>
+{{ end }}
+
+{{ if .NewStart }}
+<p>🕐 <strong>Nouvel horaire :</strong> {{ .NewStart }} - {{ .NewEnd }}</p>
+{{ end }}
+
+<p style="margin-top: 20px;">Modification détectée le {{ .Timestamp }}</p>
+</div>
+
+<div class="footer">
+<p>Ce mail a été envoyé automatiquement par le système EDU Middleware.</p>
+<p>ISIMA - Université Clermont Auvergne</p>
+</div>
+</body>
+</html>
